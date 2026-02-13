@@ -1,14 +1,16 @@
 const express = require("express");
+const cors = require("cors");
 const { scrapeProduct } = require("./prices-by-search");
 
 const app = express();
 
+app.use(cors());
+app.use(express.json());
+
 app.get("/", (req, res) => {
   res
     .status(200)
-    .send(
-      "OK. Usa /health o /search?q=2144208 (o /search?id=...)."
-    );
+    .send("OK. Usa /health o /search?q=2144208 (o /search?id=...).");
 });
 
 app.get("/health", (req, res) => {
