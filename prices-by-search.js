@@ -82,31 +82,84 @@ async function getMinForRegion(page, regionId) {
   }
 }
 
+// ---------- NUEVO: click robusto al primer producto ----------
+async function clickFirstProduct(page) {
+  const candidates = [
+    'a:has-text("Ver Producto")',
+    'a:has-text("Ver producto")',
+    'a:has-text("Ver detalle")',
+    'a:has-text("Detalle")',
+    // fallback por URL (cambia a veces)
+    'a[href*="/producto"]',
+    'a[href*="producto"]',
+  ];
+
+  const start = Date.now();
+  const maxMs = 30000;
+
+  while (Date.now() - start < maxMs) {
+    for (const sel of candidates) {
+      const loc = page.locator(sel).first();
+      const count = await loc.count();
+      if (count > 0) {
+        try {
+          await loc.scrollIntoViewIfNeeded({ timeout: 1500 });
+        } catch {}
+        try {
+          await loc.click({ timeout: 4000, force: true });
+          return true;
+        } catch {}
+      }
+    }
+    await page.waitForTimeout(250);
+  }
+
+  return false;
+}
+
 async function scrapeProduct(query) {
   const browser = await chromium.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
-  const page = await browser.newPage();
+  // User-Agent para estabilidad
+  const page = await browser.newPage({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  });
 
-  await page.goto(SEARCH_URL, { timeout: 60000, waitUntil: "domcontentloaded" });
+  // Mejor espera de carga
+  await page.goto(SEARCH_URL, { timeout: 60000, waitUntil: "networkidle" });
 
   // Buscar por ID/nombre
-  const searchInput = page.locator('input[type="search"], input[placeholder*="Busca"]');
+  const searchInput = page.locator(
+    'input[type="search"], input[placeholder*="Busca"], input[placeholder*="buscar"], input[aria-label*="Buscar"], input[aria-label*="buscar"]'
+  );
   await searchInput.waitFor({ timeout: 20000 });
-  await searchInput.fill(query);
+  await searchInput.fill(String(query));
   await searchInput.press("Enter");
 
-  // Entrar al primer resultado
-  await page.waitForSelector('a:has-text("Ver Producto")', { timeout: 25000 });
-  await page.locator('a:has-text("Ver Producto")').first().click();
+  // Intentar entrar al primer resultado (robusto)
+  const ok = await clickFirstProduct(page);
+  if (!ok) {
+    const url = page.url();
+    await browser.close();
+    throw new Error(
+      `No pude encontrar link al producto tras buscar "${query}". URL actual: ${url}`
+    );
+  }
 
   // Esperar título real del producto
   await page.waitForSelector("h1.page-title", { timeout: 30000 });
   const title = (await page.locator("h1.page-title").first().innerText()).trim();
 
-  const result = { id: query, nombre: title, moneda: "CLP", fuente: "mercadopublico" };
+  const result = {
+    id: String(query),
+    nombre: title,
+    moneda: "CLP",
+    fuente: "mercadopublico",
+  };
 
   for (const [regionName, regionId] of Object.entries(REGIONES)) {
     const min = await getMinForRegion(page, regionId);
