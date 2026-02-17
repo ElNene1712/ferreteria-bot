@@ -1,7 +1,8 @@
-# Imagen base con Node
 FROM node:22-bookworm-slim
 
-# Dependencias necesarias para que Playwright/Chromium corra en Linux
+WORKDIR /app
+
+# Instala deps necesarias para chromium (playwright)
 RUN apt-get update && apt-get install -y \
   ca-certificates \
   fonts-liberation \
@@ -43,19 +44,16 @@ RUN apt-get update && apt-get install -y \
   xdg-utils \
   && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
-# Instala deps primero (mejor cache)
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Instala browsers de Playwright
+# Instala chromium de Playwright (esto lo dejaste bien)
 RUN npx playwright install --with-deps chromium
 
-# Copia el resto del código
 COPY . .
 
-ENV PORT=3000
+ENV NODE_ENV=production
 EXPOSE 3000
 
+# 👇 ESTO ES LO QUE TE ESTÁ FALTANDO CASI SEGURO
 CMD ["npm", "start"]

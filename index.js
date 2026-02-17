@@ -31,4 +31,27 @@ app.get("/search", async (req, res) => {
 
   try {
     const result = await scrapeProduct(query);
-    retu
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("ERROR /search:", err);
+    return res.status(500).json({
+      error: "Scrape failed",
+      details: String(err?.message || err),
+    });
+  }
+});
+
+const PORT = Number(process.env.PORT || 3000);
+
+// OJO: en Railway lo importante es escuchar en 0.0.0.0 y en process.env.PORT
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
+
+// Para que NO se muera “silenciosamente”
+process.on("unhandledRejection", (reason) => {
+  console.error("UNHANDLED REJECTION:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+});
