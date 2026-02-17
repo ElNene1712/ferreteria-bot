@@ -47,13 +47,15 @@ RUN apt-get update && apt-get install -y \
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Instala chromium de Playwright (esto lo dejaste bien)
+# Instala chromium de Playwright
 RUN npx playwright install --with-deps chromium
 
 COPY . .
 
 ENV NODE_ENV=production
+# ✅ Evita problemas de path/caché de browsers en Railway/Docker
+ENV PLAYWRIGHT_BROWSERS_PATH=0
+
 EXPOSE 3000
 
-# 👇 ESTO ES LO QUE TE ESTÁ FALTANDO CASI SEGURO
 CMD ["npm", "start"]

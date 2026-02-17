@@ -1,4 +1,14 @@
-const { chromium } = require("playwright");
+// prices-by-search.js
+
+// ✅ Lazy-load: NO cargamos Playwright al arrancar el server.
+// Solo se importa cuando llamas /search.
+let chromium;
+function getChromium() {
+  if (!chromium) {
+    ({ chromium } = require("playwright"));
+  }
+  return chromium;
+}
 
 const SEARCH_URL =
   "https://conveniomarco2.mercadopublico.cl/ferreteria2/productos-de-ferreteria";
@@ -82,14 +92,13 @@ async function getMinForRegion(page, regionId) {
   }
 }
 
-// ---------- NUEVO: click robusto al primer producto ----------
+// ---------- Click robusto al primer producto ----------
 async function clickFirstProduct(page) {
   const candidates = [
     'a:has-text("Ver Producto")',
     'a:has-text("Ver producto")',
     'a:has-text("Ver detalle")',
     'a:has-text("Detalle")',
-    // fallback por URL (cambia a veces)
     'a[href*="/producto"]',
     'a[href*="producto"]',
   ];
@@ -118,56 +127,55 @@ async function clickFirstProduct(page) {
 }
 
 async function scrapeProduct(query) {
+  const chromium = getChromium();
+
   const browser = await chromium.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
-  // User-Agent para estabilidad
   const page = await browser.newPage({
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
   });
 
-  // Mejor espera de carga
-  await page.goto(SEARCH_URL, { timeout: 60000, waitUntil: "networkidle" });
+  try {
+    await page.goto(SEARCH_URL, { timeout: 60000, waitUntil: "networkidle" });
 
-  // Buscar por ID/nombre
-  const searchInput = page.locator(
-    'input[type="search"], input[placeholder*="Busca"], input[placeholder*="buscar"], input[aria-label*="Buscar"], input[aria-label*="buscar"]'
-  );
-  await searchInput.waitFor({ timeout: 20000 });
-  await searchInput.fill(String(query));
-  await searchInput.press("Enter");
-
-  // Intentar entrar al primer resultado (robusto)
-  const ok = await clickFirstProduct(page);
-  if (!ok) {
-    const url = page.url();
-    await browser.close();
-    throw new Error(
-      `No pude encontrar link al producto tras buscar "${query}". URL actual: ${url}`
+    const searchInput = page.locator(
+      'input[type="search"], input[placeholder*="Busca"], input[placeholder*="buscar"], input[aria-label*="Buscar"], input[aria-label*="buscar"]'
     );
+    await searchInput.waitFor({ timeout: 20000 });
+    await searchInput.fill(String(query));
+    await searchInput.press("Enter");
+
+    const ok = await clickFirstProduct(page);
+    if (!ok) {
+      const url = page.url();
+      throw new Error(
+        `No pude encontrar link al producto tras buscar "${query}". URL actual: ${url}`
+      );
+    }
+
+    await page.waitForSelector("h1.page-title", { timeout: 30000 });
+    const title = (await page.locator("h1.page-title").first().innerText()).trim();
+
+    const result = {
+      id: String(query),
+      nombre: title,
+      moneda: "CLP",
+      fuente: "mercadopublico",
+    };
+
+    for (const [regionName, regionId] of Object.entries(REGIONES)) {
+      const min = await getMinForRegion(page, regionId);
+      result[regionName] = min ?? null;
+    }
+
+    return result;
+  } finally {
+    await browser.close().catch(() => {});
   }
-
-  // Esperar título real del producto
-  await page.waitForSelector("h1.page-title", { timeout: 30000 });
-  const title = (await page.locator("h1.page-title").first().innerText()).trim();
-
-  const result = {
-    id: String(query),
-    nombre: title,
-    moneda: "CLP",
-    fuente: "mercadopublico",
-  };
-
-  for (const [regionName, regionId] of Object.entries(REGIONES)) {
-    const min = await getMinForRegion(page, regionId);
-    result[regionName] = min ?? null;
-  }
-
-  await browser.close();
-  return result;
 }
 
 module.exports = { scrapeProduct };
