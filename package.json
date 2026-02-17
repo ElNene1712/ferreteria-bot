@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Ferretería scraper",
   "main": "server.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node server.js",
     "postinstall": "npx playwright install --with-deps chromium"
