@@ -1,2 +1,2 @@
-// Entry point para Railway
-require("./server.js");
+// index.js
+require("./server");
