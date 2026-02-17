@@ -2,10 +2,10 @@
   "name": "ferreteria-bot",
   "version": "1.0.0",
   "description": "Ferretería scraper",
-  "main": "index.js",
+  "main": "server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node index.js",
+    "start": "node server.js",
     "postinstall": "npx playwright install --with-deps chromium"
   },
   "dependencies": {
