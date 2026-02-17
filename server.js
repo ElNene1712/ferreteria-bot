@@ -1,9 +1,3 @@
-const express = require("express");
-const cors = require("cors");
-const { scrapeProduct } = require("./prices-by-search");
-
-const app = express();
-
 app.use(cors());
 app.use(express.json());
 
@@ -16,10 +10,7 @@ app.use((req, res, next) => {
 app.get("/", (req, res) => {
   res
     .status(200)
-    .send("OK. Usa /health o /search?q=2144208 (o /search?id=...).");
-});
-
-app.get("/health", (req, res) => {
+@@ -17,24 +23,34 @@
   res.json({ ok: true });
 });
 
@@ -39,6 +30,7 @@ app.get("/search", async (req, res) => {
   if (!query) return res.status(400).json({ error: "Falta id o q" });
 
   try {
+    const result = await scrapeProduct(query);
     const result = await withTimeout(scrapeProduct(query), 25000);
     res.json(result);
   } catch (err) {
